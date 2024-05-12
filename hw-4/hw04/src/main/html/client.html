@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat Client</title>
+</head>
+
+<body>
+    <h1>My Text Chat</h1>
+    <div id="chatForm" style="display:block;">
+        <textarea id="errorArea" rows="5" readonly></textarea>
+        <br>
+        <input type="text" id="nameInput" placeholder="Введите ваше имя">
+        <button id="joinButton" onclick="joinChat()">Присоединиться</button>
+        <br>
+        <textarea id="inputArea" placeholder="Введите сообщение (до 25 символов)" rows="1" maxlength="25"></textarea>
+        <textarea id="messageArea" rows="10" readonly></textarea>
+        <button id="sendButton" onclick="sendMessage()">Отправить</button>
+    </div>
+
+    <script>
+        const serverUrl = "ws://localhost:10000";
+
+        const errorArea = document.getElementById('errorArea');
+        const nameInput = document.getElementById('nameInput');
+        const joinButton = document.getElementById('joinButton');
+        const inputArea = document.getElementById('inputArea');
+        const messageArea = document.getElementById('messageArea');
+        const sendButton = document.getElementById('sendButton');
+
+        let webSocket;
+        var user = null;
+
+        function connectToServer() {
+            webSocket = new WebSocket(serverUrl);
+
+            webSocket.onopen = function (event) {
+                console.log('Соединение установлено');
+                nameInput.disabled = false;
+                joinButton.disabled = false;
+                inputArea.disabled = false;
+                sendButton.disabled = false;
+                errorArea.value = '';
+            };
+
+            webSocket.onmessage = function (event) {
+                const message = event.data;
+                appendMessage(message);
+            };
+
+            webSocket.onerror = function (event) {
+                console.error('Ошибка подключения к серверу');
+                nameInput.disabled = true;
+                joinButton.disabled = true;
+                inputArea.disabled = true;
+                sendButton.disabled = true;
+                let seconds = 10;
+                const interval = setInterval(() => {
+                    errorArea.value = `Не удалось установить соединение. Повторная попытка через ${seconds} секунд...`;
+                    seconds--;
+                    if (seconds < 0) {
+                        clearInterval(interval);
+                        connectToServer();
+                    }
+                }, 1000);
+            };
+
+            webSocket.onclose = function (event) {
+                errorArea.value = 'Соединение закрыто';
+                console.log(errorArea.value);
+                nameInput.disabled = true;
+                joinButton.disabled = true;
+                inputArea.disabled = true;
+                sendButton.disabled = true;
+            };
+        }
+
+        function joinChat() {
+            const name = nameInput.value.trim();
+
+            if (name !== '') {
+                user = name;
+                nameInput.disabled = true;
+                joinButton.disabled = true;
+                nameInput.value = '';
+                appendMessage(`Пользователь ${user} присоединился к чату`);
+            } else {
+                alert('Пожалуйста, введите имя');
+            }
+        }
+
+        function sendMessage() {
+            if (webSocket.readyState === WebSocket.OPEN) {
+                if (user !== null) {
+                    var message = inputArea.value;
+
+                    if (message == '') {
+                        alert('Попытка отправить пустое сообщение');
+                    } else {
+                        webSocket.send("user: " + user + " message: " + message);
+                        inputArea.value = '';
+                    }
+                } else {
+                    alert('Прежде чем отправлять сообщение, пожалуйста, присоединитесь к чату');
+                }
+            } else {
+                console.error("WebSocket не открыт");
+            }
+        }
+
+        function appendMessage(message) {
+            messageArea.value += message + '\n\n';
+            messageArea.scrollTop = messageArea.scrollHeight;
+        }
+
+        connectToServer();
+    </script>
+</body>
+
+</html>
